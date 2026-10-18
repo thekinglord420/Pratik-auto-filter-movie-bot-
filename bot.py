@@ -7,6 +7,7 @@ import config
 # Initialize Bot & Database Connectivity
 bot = Client("MovieBot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)
 db_client = AsyncIOMotorClient(config.DATABASE_URI)
+# Database name aur collection name ko aapke Atlas configuration se strict link kiya hai
 db = db_client["MovieVerse"]["MovieVerseHD"]
 
 @bot.on_message(filters.command("start"))
@@ -19,32 +20,31 @@ async def start_cmd(client, message):
         ]])
     )
 
-# 🔥 AUTO-SAVE LOGIC: Jab aap channel me fresh file daalenge, ye instant save karega
-@bot.on_message((filters.document | filters.video | filters.audio) & ~filters.private)
+# 🔥 AUTO-SAVE LISTENER: Jab aap channel me file bhejenge (jahan bot admin hai), ye automatic database me save karega!
+@bot.on_message((filters.document | filters.video) & ~filters.private)
 async def auto_save_files(client, message):
-    file = message.document or message.video or message.audio
-    file_name = getattr(file, 'file_name', '') or message.caption or "Unknown Movie"
-    
-    # Save target name in clean format
-    clean_name = str(file_name).lower().strip()
+    file = message.document or message.video
+    # Extension hatakar clean filename nikali jati hai
+    raw_name = getattr(file, 'file_name', '') or message.caption or "Unknown Movie"
+    file_name = str(raw_name).replace(".mp4", "").replace(".mkv", "").strip().lower()
     
     data = {
-        "file_name": clean_name,
+        "file_name": file_name,
         "chat_id": message.chat.id,
         "message_id": message.id
     }
-    
+    # Database user aur entry create/update structure
     await db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
-    print(f"✅ Saved Successfully: {clean_name}")
+    print(f"✅ Auto-Indexed In MongoDB: {file_name}")
 
-# 🔍 DIRECT SEARCH: Bina kisi loading loop ke direct output dega
+# 🔍 REAL-TIME SEARCH: Users ke dhoondhne par ShrinkMe encryption button deliver karega
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
     query = str(message.text).lower().strip()
-    msg = await message.reply_text("🔍 Fetching data, please wait...")
+    msg = await message.reply_text("🔍 Searching database, please wait...")
     
-    # Direct find logic without complex regex loading loops
-    cursor = db.find({"file_name": {"$regex": query}})
+    # Standard text searching regex cursor algorithm
+    cursor = db.find({"file_name": {"$regex": query, "$options": "i"}})
     results = await cursor.to_list(length=10)
         
     if not results:
@@ -57,7 +57,7 @@ async def search_movie(client, message):
         original_link = f"https://t.me{chat_id_str}/{file['message_id']}"
         earning_link = f"https://{config.SHORTLINK_URL}/api?api={config.SHORTLINK_API}&url={original_link}"
         
-        buttons.append([InlineKeyboardButton(f"🎬 CLICK TO DOWNLOAD VIA SHRINKME", url=earning_link)])
+        buttons.append([InlineKeyboardButton(f"🎬 DOWNLOAD VIA SHRINKME", url=earning_link)])
         
     await msg.delete()
     await message.reply_text(
@@ -65,5 +65,6 @@ async def search_movie(client, message):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-print("⚡ Bot is starting...")
+print("⚡ Dynamic Auto-Filter Bot is starting...")
 bot.run()
+
