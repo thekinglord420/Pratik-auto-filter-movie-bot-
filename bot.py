@@ -7,10 +7,7 @@ import config
 # Initialize Bot & Database Connectivity
 bot = Client("MovieBot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)
 db_client = AsyncIOMotorClient(config.DATABASE_URI)
-
-# Yeh backup automatic saare dynamic collections ko check karega
 db = db_client["MovieVerse"]["MovieVerseHD"]
-alt_db = db_client["MovieVerse"]["master"]
 
 @bot.on_message(filters.command("start"))
 async def start_cmd(client, message):
@@ -22,33 +19,33 @@ async def start_cmd(client, message):
         ]])
     )
 
-# 🔥 UNIVERSAL AUTO-SAVE: Kisi bhi channel me jab aap file bhejenge, ye instant save karega
+# 🔥 AUTO-SAVE LOGIC: Jab aap channel me fresh file daalenge, ye instant save karega
 @bot.on_message((filters.document | filters.video | filters.audio) & ~filters.private)
 async def auto_save_files(client, message):
     file = message.document or message.video or message.audio
     file_name = getattr(file, 'file_name', '') or message.caption or "Unknown Movie"
     
+    # Save target name in clean format
+    clean_name = str(file_name).lower().strip()
+    
     data = {
-        "file_name": str(file_name).lower().strip(),
+        "file_name": clean_name,
         "chat_id": message.chat.id,
         "message_id": message.id
     }
     
-    # Dono collections me save karenge taki data miss na ho
     await db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
-    await alt_db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
-    print(f"✅ Saved: {file_name}")
+    print(f"✅ Saved Successfully: {clean_name}")
 
-# 🔍 FAST SEARCH LOGIC: Bina kisi loading loop ke direct output dega
+# 🔍 DIRECT SEARCH: Bina kisi loading loop ke direct output dega
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
     query = str(message.text).lower().strip()
-    msg = await message.reply_text("🔍 Searching data layout, please wait...")
+    msg = await message.reply_text("🔍 Fetching data, please wait...")
     
-    # Pehle primary check karega, agar fail hua toh secondary checks lagayega
-    results = await db.find({"file_name": {"$regex": query, "$options": "i"}}).to_list(length=10)
-    if not results:
-        results = await alt_db.find({"file_name": {"$regex": query, "$options": "i"}}).to_list(length=10)
+    # Direct find logic without complex regex loading loops
+    cursor = db.find({"file_name": {"$regex": query}})
+    results = await cursor.to_list(length=10)
         
     if not results:
         await msg.edit("❌ No files found! Check spelling and try again.\n\n💡 Tip: Channel me naye naam ke sath file forward karein fir search karein.")
@@ -60,7 +57,7 @@ async def search_movie(client, message):
         original_link = f"https://t.me{chat_id_str}/{file['message_id']}"
         earning_link = f"https://{config.SHORTLINK_URL}/api?api={config.SHORTLINK_API}&url={original_link}"
         
-        buttons.append([InlineKeyboardButton(f"🎬 CLICK TO DOWNLOAD ({message.text.upper()})", url=earning_link)])
+        buttons.append([InlineKeyboardButton(f"🎬 CLICK TO DOWNLOAD VIA SHRINKME", url=earning_link)])
         
     await msg.delete()
     await message.reply_text(
@@ -70,4 +67,3 @@ async def search_movie(client, message):
 
 print("⚡ Bot is starting...")
 bot.run()
-
