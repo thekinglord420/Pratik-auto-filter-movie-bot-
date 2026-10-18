@@ -1,16 +1,17 @@
 name: Start Fresh Movie Bot
+
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    - run: pip install --upgrade pip setuptools wheel
-    - run: pip install --only-binary=:all: tgcrypto motor==3.3.2 pymongo==4.6.3 requests pyrogram==2.0.106
-    - run: python bot.py
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install pyrogram tgcrypto motor==3.3.2 pymongo==4.6.3 requests
+      - run: python bot.py
