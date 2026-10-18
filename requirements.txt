@@ -1,4 +1,5 @@
 pyrogram==2.0.106
 tgcrypto
-motor==3.3.2
-pymongo==4.6.1
+pandas
+requests
+
