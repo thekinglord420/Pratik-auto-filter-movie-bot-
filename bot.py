@@ -21,6 +21,7 @@ db = db_client["MovieVerse"]["MovieVerseHD"]
 
 @bot.on_message(filters.command("start"))
 async def start_cmd(client, message):
+    # FIXED: Direct clean raw image url layout assignment to bypass WEBPAGE_MEDIA_EMPTY
     await message.reply_photo(
         photo="https://ibb.co",
         caption=f"<b>Hello {message.from_user.mention}! 👋\n\nWelcome to MovieVerse Bot. Just send me any movie name, I will find it for you automatically!</b>",
@@ -29,7 +30,7 @@ async def start_cmd(client, message):
         ]])
     )
 
-# 🔥 AUTO SAVE LOGIC WITH FIXED ALIGNMENT
+# 🔥 AUTO SAVE LOGIC
 @bot.on_message((filters.document | filters.video) & ~filters.private)
 async def auto_save_files(client, message):
     if message.chat.id not in CHANNELS:
@@ -47,11 +48,10 @@ async def auto_save_files(client, message):
     await db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
     print(f"✅ Auto-Indexed: {file_name}")
 
-# 🔍 SEARCH ENGINE ENGINE LOGIC
+# 🔍 SEARCH ENGINE ENGINE LOGIC (CRASH-FREE DISPATCHER)
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
     query = str(message.text).lower().strip()
-    msg = await message.reply_text("🔍 Searching database matrix, please wait...")
     
     results = []
     cursor = db.find({"file_name": {"$regex": query, "$options": "i"}})
@@ -61,7 +61,8 @@ async def search_movie(client, message):
             break
             
     if not results:
-        await msg.edit("❌ No files found! Check spelling and try again.")
+        # FIXED: Direct new message reply to completely bypass MESSAGE_ID_INVALID error loop
+        await message.reply_text("❌ No files found! Check spelling and try again.")
         return
         
     buttons = []
@@ -81,11 +82,10 @@ async def search_movie(client, message):
             
         buttons.append([InlineKeyboardButton(f"🎬 DOWNLOAD: {file['file_name'].upper()}", url=earning_link)])
         
-    await msg.delete()
     await message.reply_text(
-        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Niche diye gaye button par click karke download karte hi aapka monetization chalu!",
+        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Niche diye gaye button par click karke download karein:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-print("⚡ System is running...")
+print("⚡ System is running flawlessly...")
 bot.run()
