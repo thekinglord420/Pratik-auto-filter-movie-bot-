@@ -4,7 +4,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from motor.motor_asyncio import AsyncIOMotorClient
 import requests
 
-# ⚙️ FULLY CONFIGURED AUTH PARAMETERS
+# CONFIGURED AUTH PARAMETERS
 API_ID = 36033911
 API_HASH = "e66cab096ef6482d2a3b366b9e7606af"
 BOT_TOKEN = "8894292698:AAE12lJJmhG5rFQ7zDrPVXc2D-u6kLLsDAg"
@@ -29,10 +29,9 @@ async def start_cmd(client, message):
         ]])
     )
 
-# 🔥 REAL AUTOMATIC SAVE: Jab aap channel me video post karenge, ye bina Sheet ke instant database me save karega!
+# 🔥 AUTO SAVE LOGIC WITH FIXED ALIGNMENT
 @bot.on_message((filters.document | filters.video) & ~filters.private)
 async def auto_save_files(client, message):
-    # Check strict authorization channel limits
     if message.chat.id not in CHANNELS:
         return
         
@@ -46,15 +45,14 @@ async def auto_save_files(client, message):
         "message_id": message.id
     }
     await db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
-    print(f"✅ Auto-Indexed In Database: {file_name}")
+    print(f"✅ Auto-Indexed: {file_name}")
 
-# 🔍 SEARCH ENGINE: Ganda white JSON code page hatakar seedhe working earning window open karega!
+# 🔍 SEARCH ENGINE ENGINE LOGIC
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
     query = str(message.text).lower().strip()
     msg = await message.reply_text("🔍 Searching database matrix, please wait...")
     
-    # Fast loop cursor verification
     results = []
     cursor = db.find({"file_name": {"$regex": query, "$options": "i"}})
     async for doc in cursor:
@@ -71,7 +69,6 @@ async def search_movie(client, message):
         chat_id_str = str(file['chat_id']).replace("-100", "")
         original_link = f"https://t.me{chat_id_str}/{file['message_id']}"
         
-        # 🔥 FIXED API ENGINE CALL: JSON template bypass karke shortlink direct access text nikalna
         try:
             api_url = f"https://{SHORTLINK_URL}/api?api={SHORTLINK_API}&url={original_link}"
             response = requests.get(api_url).json()
@@ -79,17 +76,16 @@ async def search_movie(client, message):
                 earning_link = response.get("shortenedUrl")
             else:
                 earning_link = original_link
-        except Exception as e:
+        except:
             earning_link = original_link
             
         buttons.append([InlineKeyboardButton(f"🎬 DOWNLOAD: {file['file_name'].upper()}", url=earning_link)])
         
     await msg.delete()
     await message.reply_text(
-        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Niche diye gaye button par click karke download karein:",
+        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Niche diye gaye button par click karke download karte hi aapka monetization chalu!",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-print("⚡ Fully Automated Movie Bot is starting...")
+print("⚡ System is running...")
 bot.run()
-
