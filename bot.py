@@ -7,7 +7,6 @@ import config
 # Initialize Bot & Database Connectivity
 bot = Client("MovieBot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN)
 db_client = AsyncIOMotorClient(config.DATABASE_URI)
-# Database name aur collection name ko aapke Atlas configuration se strict link kiya hai
 db = db_client["MovieVerse"]["MovieVerseHD"]
 
 @bot.on_message(filters.command("start"))
@@ -20,11 +19,10 @@ async def start_cmd(client, message):
         ]])
     )
 
-# 🔥 AUTO-SAVE LISTENER: Jab aap channel me file bhejenge (jahan bot admin hai), ye automatic database me save karega!
+# 🔥 AUTO-SAVE LISTENER: Channel me file aate hi instant database me save karega
 @bot.on_message((filters.document | filters.video) & ~filters.private)
 async def auto_save_files(client, message):
     file = message.document or message.video
-    # Extension hatakar clean filename nikali jati hai
     raw_name = getattr(file, 'file_name', '') or message.caption or "Unknown Movie"
     file_name = str(raw_name).replace(".mp4", "").replace(".mkv", "").strip().lower()
     
@@ -33,38 +31,41 @@ async def auto_save_files(client, message):
         "chat_id": message.chat.id,
         "message_id": message.id
     }
-    # Database user aur entry create/update structure
     await db.update_one({"message_id": message.id}, {"$set": data}, upsert=True)
-    print(f"✅ Auto-Indexed In MongoDB: {file_name}")
+    print(f"✅ Auto-Indexed: {file_name}")
 
-# 🔍 REAL-TIME SEARCH: Users ke dhoondhne par ShrinkMe encryption button deliver karega
+# 🔍 LOOP-FREE SEARCH: Bina fase instant result nikalega
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
     query = str(message.text).lower().strip()
-    msg = await message.reply_text("🔍 Searching database, please wait...")
     
-    # Standard text searching regex cursor algorithm
+    # Instant local response without loading text to avoid client loop
+    results = []
+    
+    # Loop-free safe async cursor evaluation
     cursor = db.find({"file_name": {"$regex": query, "$options": "i"}})
-    results = await cursor.to_list(length=10)
+    async for doc in cursor:
+        results.append(doc)
+        if len(results) >= 10: # Max 10 results limit to avoid overload
+            break
         
     if not results:
-        await msg.edit("❌ No files found! Check spelling and try again.\n\n💡 Tip: Channel me naye naam ke sath file forward karein fir search karein.")
+        await message.reply_text("❌ No files found! Check spelling and try again.")
         return
         
     buttons = []
     for file in results:
         chat_id_str = str(file['chat_id']).replace("-100", "")
+        # Real-time message link preparation
         original_link = f"https://t.me{chat_id_str}/{file['message_id']}"
         earning_link = f"https://{config.SHORTLINK_URL}/api?api={config.SHORTLINK_API}&url={original_link}"
         
         buttons.append([InlineKeyboardButton(f"🎬 DOWNLOAD VIA SHRINKME", url=earning_link)])
         
-    await msg.delete()
     await message.reply_text(
-        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Niche diye gaye link par click karke apni file download karein:",
+        f"🍿 <b>Found Results for: '{message.text}'</b>\n\n👇 Click below to get your file:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-print("⚡ Dynamic Auto-Filter Bot is starting...")
+print("⚡ Bot is starting...")
 bot.run()
-
