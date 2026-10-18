@@ -23,11 +23,12 @@ async def start_cmd(client, message):
 @bot.on_message(filters.chat(config.CHANNELS) & (filters.document | filters.video | filters.audio))
 async def auto_save_files(client, message):
     file = message.document or message.video or message.audio
-    file_name = file.file_name if hasattr(file, 'file_name') else (message.caption or "Unknown Movie")
+    # Agar file name na ho toh caption use karega
+    file_name = getattr(file, 'file_name', '') or message.caption or "Unknown Movie"
     
-    # Save into MongoDB
+    # Save into MongoDB (Case-insensitive formatting ke liye name lowercase rakhenge)
     data = {
-        "file_name": file_name.lower(),
+        "file_name": str(file_name).lower(),
         "chat_id": message.chat.id,
         "message_id": message.id
     }
@@ -37,12 +38,12 @@ async def auto_save_files(client, message):
 # 🔍 MOVIE SEARCH: Users ke dhoondhne par link deliver karega
 @bot.on_message(filters.text & filters.private)
 async def search_movie(client, message):
-    query = message.text.lower()
+    query = str(message.text).lower().strip()
     msg = await message.reply_text("🔍 Searching database, please wait...")
     
-    # Simple Search Query in MongoDB
+    # Advanced regular expression search logic jo dynamic fields ko match karega
     files = db.find({"file_name": {"$regex": query, "$options": "i"}})
-    results = await files.to_list(length=10)
+    results = await files.to_list(length=15)
     
     if not results:
         await msg.edit("❌ No files found! Check spelling and try again.")
@@ -50,12 +51,14 @@ async def search_movie(client, message):
         
     buttons = []
     for file in results:
-        # Generate clean private post channel links format
+        # Chat ID formatting Pyrogram standard links ke liye
         chat_id_str = str(file['chat_id']).replace("-100", "")
         original_link = f"https://t.me{chat_id_str}/{file['message_id']}"
         earning_link = f"https://{config.SHORTLINK_URL}/api?api={config.SHORTLINK_API}&url={original_link}"
         
-        buttons.append([InlineKeyboardButton(f"🎬 Movie Link", url=earning_link)])
+        # Display name clean dikhane ke liye extraction format
+        display_name = file.get('file_name', 'Movie Link').upper()
+        buttons.append([InlineKeyboardButton(f"🎬 {display_name}", url=earning_link)])
         
     await msg.delete()
     await message.reply_text(
